@@ -36,7 +36,7 @@
   <h3 align="center">Google Photos Exif Merger</h3>
 
   <p align="center">
-    An awesome README template to jumpstart your projects!
+    Merge metadata into media files!
     <br />
     <a href="https://github.com/ckinateder/google-photos-exif-merger"><strong>Explore the docs »</strong></a>
     <br />
