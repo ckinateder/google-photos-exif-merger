@@ -27,3 +27,14 @@ def _find_in_matched(l: List[Tuple[str]], item:str, key=True) -> Tuple[str]:
             if item in jsonf:
                 return (mediaf, jsonf)
     return False
+
+def _remove_from_list(l: List[Tuple[str, Tuple[str]]], item:str) -> bool:
+    i = None
+    for index, (f, _) in enumerate(l):
+        if f == item:
+            i = index
+
+    if i:
+        l.remove(l[i])
+        return True
+    return False

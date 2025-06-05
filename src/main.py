@@ -5,7 +5,8 @@ import json
 import re
 import pdb
 from typing import Union, List, Tuple
-from util import _format_list, _find_in_matched
+
+from util import _format_list, _find_in_matched, _remove_from_list
 
 from tqdm import trange, tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -21,6 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif", ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".f4v", ".f4p", ".f4a", ".f4b"]
+LIVE_PHOTO_EXTENSION = ".mp4"
 JSON_EXTENSION = ".json"
 
 
@@ -102,8 +104,8 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
             # get rid of duplicates
             potential_jsons = list(set(potential_jsons))
 
-            if basename=="IMG_0356":
-                pdb.set_trace()
+            #if basename=="IMG_0356":
+            #    pdb.set_trace()
 
             
             # if less than 1 potential matches, there is a problem. move on
@@ -169,26 +171,37 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
     matched_files += recovered
     for f, _ in recovered:
         missing_files.remove(f)
+    
+    recovered = []
 
     # stage 3: examine all the ambiguous files
+    logger.info(f"Attempting to fix {len(ambiguous_files)} ambiguous metadata files...")
     with logging_redirect_tqdm():
         for file, prospects in tqdm(ambiguous_files, desc="ambiguous files", leave=False, dynamic_ncols=True):
             # check if one of the ambiguous ones has already been matched? and then pick the other one
-            potential_jsons = []
             basename = os.path.splitext(file)[0]
-            
-            if basename=="IMG_0356":
-                pdb.set_trace()
+            media_extension = os.path.splitext(file)[1] #.lower()
+            # first easy case: LIVE PHOTO
+            if media_extension.lower() == LIVE_PHOTO_EXTENSION:
+                # just pick the first one
+                recovered.append((file, prospects[0]))
 
-            # first easy case
-
+    logger.info(f"Recovered {len(recovered)} ambiguous metadata files.")
+    matched_files += recovered
+    # remove from list
+    recovered_fs, _ = zip(*recovered)
+    for i, (f, _) in enumerate(ambiguous_files):
+        if f in recovered_fs:
+            ambiguous_files[i] = None
+    
+    ambiguous_files = [x for x in ambiguous_files if x is not None]
     
     # sort by name
     matched_files.sort(key=lambda x: x[0])
     ambiguous_files.sort(key=lambda x: x[0])
 
     # print
-    logger.info(f"Matched:\n{_format_list(matched_files)}")
+    #logger.info(f"Matched:\n{_format_list(matched_files)}")
     logger.info(f"Missing:\n{_format_list(missing_files)}")
     logger.info(f"Ambiguous:\n{_format_list(ambiguous_files)}")
     logger.info(f"Matched    {len(matched_files)}/{total_media_files} files")
