@@ -6,7 +6,7 @@ import re
 import pdb
 from typing import Union, List, Tuple
 
-from util import _format_list, _find_in_matched, _remove_from_list
+from util import _format_list, _find_in_matched, _remove_from_list, _list_files
 
 from tqdm import trange, tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -25,8 +25,19 @@ MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif", ".mp4", ".mov", "
 LIVE_PHOTO_EXTENSION = ".mp4"
 JSON_EXTENSION = ".json"
 
+def find_sidecar_files(directory:str):
+    files_in_directory = _list_files(directory)
+    matched_files, missing_files, ambiguous_files = match_files_from_file_list(files_in_directory)
+    with logging_redirect_tqdm():
+        for media_file, json_file in tqdm(matched_files, desc="validating", leave=False, dynamic_ncols=True):
+            full_media_file = os.path.join(directory, media_file)
+            assert os.path.isfile(full_media_file), f"{full_media_file} doesn't exist!"
+            full_json_file = os.path.join(directory, json_file)
+            assert os.path.isfile(full_json_file), f"{full_json_file} doesn't exist!"
+    
+    return matched_files, missing_files, ambiguous_files
 
-def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str, Tuple[str]]]]:
+def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]], List[str], List[Tuple[str, Tuple[str]]]]:
     """
     This function will match the json metadata files with the images in the same directory. There will be a default matching scheme, but there will be cases for other matching schemes.
 
@@ -44,8 +55,8 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
     ambiguous_files = []
 
     # stage 1: match the json files with the media files
-    all_json_files = [f for f in os.listdir(directory) if os.path.splitext(f)[1].lower() == JSON_EXTENSION]
-    all_media_files = [f for f in os.listdir(directory) if os.path.splitext(f)[1].lower() in MEDIA_EXTENSIONS]
+    all_json_files = [f for f in filenames if os.path.splitext(f)[1].lower() == JSON_EXTENSION]
+    all_media_files = [f for f in filenames if os.path.splitext(f)[1].lower() in MEDIA_EXTENSIONS]
     total_media_files = len(all_media_files)
     total_json_files = len(all_json_files)
     logger.info(f"Found {total_media_files} media files and {total_json_files} json files")
@@ -53,7 +64,6 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
     with logging_redirect_tqdm():
         for file in tqdm(all_media_files, desc="media files", leave=False, dynamic_ncols=True):
             # initialize variables
-            fullpath = os.path.join(directory, file)
             basename = os.path.splitext(file)[0]
             media_extension = os.path.splitext(file)[1] #.lower()
             msg = f"Checking '{file}'... "
@@ -119,9 +129,8 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
 
             # if we are this far, then it matched successfully for this instance
             json_file = potential_jsons[0]
-            assert os.path.isfile(os.path.join(directory, json_file))
             matched_files.append((file, json_file))
-            logger.info(f"{msg}match found at '{json_file}'!")
+            logger.debug(f"{msg}match found at '{json_file}'!")
 
     # stage 2: search deeeper for missing files
     logger.info(f"Attempting to fix {len(missing_files)} missing metadata files...")
@@ -137,7 +146,7 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
             if len(basename) >= 47: 
                 # just check to see if the cutoff exists.
                 cutoff_file = basename[:46] + JSON_EXTENSION 
-                if os.path.exists(os.path.join(directory, cutoff_file)):
+                if cutoff_file in all_json_files:
                     recovered.append((file, cutoff_file))
                     continue
 
@@ -184,6 +193,7 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
 
     logger.info(f"Recovered {len(recovered)} ambiguous metadata files.")
     matched_files += recovered
+
     # remove from list
     recovered_fs, _ = zip(*recovered)
     for i, (f, _) in enumerate(ambiguous_files):
@@ -196,16 +206,23 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
     matched_files.sort(key=lambda x: x[0])
     ambiguous_files.sort(key=lambda x: x[0])
 
+    # final counts
+    num_matched_files = len(matched_files)
+    num_missing_files = len(missing_files)
+    num_ambiguous_files = len(ambiguous_files)
+
     # print
-    #logger.info(f"Matched:\n{_format_list(matched_files)}")
-    logger.info(f"Missing:\n{_format_list(missing_files)}")
-    logger.info(f"Ambiguous:\n{_format_list(ambiguous_files)}")
-    logger.info(f"Matched    {len(matched_files)}/{total_media_files} files")
-    logger.info(f"Missing    {len(missing_files)}/{total_media_files} files")
-    logger.info(f"Ambiguous  {len(ambiguous_files)}/{total_media_files} files")
+    logger.info(f"Matched {num_matched_files}/{total_media_files} files")
+    if num_missing_files > 0:
+        logger.warning(f"Ambiguous:\n{_format_list(ambiguous_files)}")
+        #logger.warning(f"Missing {num_missing_files}/{total_media_files} files")
+    if num_ambiguous_files > 0:
+        #logger.warning(f"Missing:\n{_format_list(missing_files)}")
+        logger.warning(f"Ambiguous {num_ambiguous_files}/{total_media_files} files")
+
 
     # conservation of mass
-    accounted_for_media_files = len(matched_files) + len(missing_files) + len(ambiguous_files)
+    accounted_for_media_files = num_matched_files + num_missing_files + num_ambiguous_files
     assert accounted_for_media_files == total_media_files, f"accounted_for_media_files != total_media_files ({accounted_for_media_files} != {total_media_files})"
     return matched_files, missing_files, ambiguous_files
 
@@ -215,9 +232,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--inputDir", type=str, required=True, help="Input directory")
     parser.add_argument("--outputDir", type=str, required=True, help="Output directory")
+    parser.add_argument("--logLevel", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level")
     args = parser.parse_args()
+
+    # Set log level from command line argument
+    logger.setLevel(getattr(logging, args.logLevel))
 
     logger.info(f"Input dir:  {args.inputDir}")
     logger.info(f"Output dir: {args.outputDir}")
 
-    matched_files, missing_files, ambiguous_files = match_files(args.inputDir)
+    matched_files, missing_files, ambiguous_files = find_sidecar_files(args.inputDir)

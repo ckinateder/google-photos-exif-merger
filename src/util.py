@@ -1,4 +1,6 @@
 from typing import Union, List, Tuple
+import logging, os
+logger = logging.getLogger(__name__)
 
 def _format_list(li) -> str:
     out = ""
@@ -38,3 +40,9 @@ def _remove_from_list(l: List[Tuple[str, Tuple[str]]], item:str) -> bool:
         l.remove(l[i])
         return True
     return False
+    
+def _list_files(directory:str)->List[str]:
+    if os.path.exists(directory):
+        return os.listdir(directory)
+    logger.warning(f"Directory '{directory}' not found!")
+    return []
