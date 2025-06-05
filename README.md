@@ -86,6 +86,8 @@
 
 I have wasted so much time trying to merge 400 gigabytes of my exported photos from Google Takeout that I decided to make a tool so that nobody else has to go through this. I tried a bunch of publicly available options, but none worked for me, so I made my own. Hopefully this works for you too.
 
+**THIS DOES NOT YET WORK!!!**
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

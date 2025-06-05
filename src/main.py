@@ -5,7 +5,7 @@ import json
 import re
 import pdb
 from typing import Union, List, Tuple
-from util import _format_list
+from util import _format_list, _find_in_matched
 
 from tqdm import trange, tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -90,7 +90,8 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
                 missing_files.append(file)
                 logger.warn(f"{msg}no match found.")
                 continue
-            elif len(potential_jsons) > 1: # we have too many
+            
+            if len(potential_jsons) > 1: # we have too many
                 # get the media extension and match it that way
                 # REMEMBER this could be MP4 too and there may not be a json for it. in that case idk
                 ambiguous_files.append((file, potential_jsons))
@@ -112,11 +113,39 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
             # just try a bunch of things
             potential_jsons = []
             basename = os.path.splitext(file)[0]
-            if len(basename) >= 47: # i don't know why this cutoff is at 46
+            ext = os.path.splitext(file)[-1]
+
+            # i don't know why this cutoff is at 46
+            if len(basename) >= 47: 
                 # just check to see if the cutoff exists.
                 cutoff_file = basename[:46] + JSON_EXTENSION 
                 if os.path.exists(os.path.join(directory, cutoff_file)):
                     recovered.append((file, cutoff_file))
+                    continue
+
+            # search for anything with the same basename in matched
+            existing_match = _find_in_matched(matched_files, basename)
+            if existing_match != False:
+                logger.debug(f"Found {basename} in matched, falling back.")
+                recovered.append((file, existing_match[1]))
+                continue
+            
+            # ------- THE FOLLOWING DOES NOTHING BUT MAY BE USEFUL FOR AMBIGUOUS FILES ------
+            # search for anything with same basename minus counter in matched
+            pattern = re.compile(r"(?P<name>.*)(?P<counter>\(\d+\))$")
+            match = pattern.match(basename)
+            if match:
+                name = match.group("name")
+                counter = match.group("counter")
+                basename_no_counter = name
+                existing_match = _find_in_matched(matched_files, basename_no_counter)
+                if existing_match != False:
+                    logger.debug(f"Found {basename} in matched, falling back.")
+                    recovered.append((file, existing_match[1]))
+                    pdb.set_trace()
+                    continue
+
+
             #else:
             #    pdb.set_trace()
             
