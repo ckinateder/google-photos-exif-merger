@@ -1,16 +1,12 @@
 # will call exiftool directly
 import argparse
 import os
-import json
 import re
 import pdb
 from typing import Union, List, Tuple
-
-from util import _format_list, _find_in_matched, _remove_from_list, _list_files
-
+#from src.util import _format_list, _find_in_matched, _remove_from_list, _list_files, _save_list
 from tqdm import trange, tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
-
 import logging
 
 # Configure logging
@@ -25,17 +21,42 @@ MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif", ".mp4", ".mov", "
 LIVE_PHOTO_EXTENSION = ".mp4"
 JSON_EXTENSION = ".json"
 
-def find_sidecar_files(directory:str):
-    files_in_directory = _list_files(directory)
-    matched_files, missing_files, ambiguous_files = match_files_from_file_list(files_in_directory)
-    with logging_redirect_tqdm():
-        for media_file, json_file in tqdm(matched_files, desc="validating", leave=False, dynamic_ncols=True):
-            full_media_file = os.path.join(directory, media_file)
-            assert os.path.isfile(full_media_file), f"{full_media_file} doesn't exist!"
-            full_json_file = os.path.join(directory, json_file)
-            assert os.path.isfile(full_json_file), f"{full_json_file} doesn't exist!"
+## -- from util \/
+def _format_list(li) -> str:
+    out = ""
+    max_digits = len(str(len(li) - 1))
+    for i, l in enumerate(li):
+        out += f"{i:0{max_digits}d}: {l}\n"
+    return out[:-2]
+
+def _find_in_matched(l: List[Tuple[str]], item:str, key=True) -> Tuple[str]:
+    """
+    Search through a list of (media_file, json_file) tuples to find a match containing the given item.
+
+    Args:
+        l (List[Tuple[str]]): List of (media_file, json_file) tuples to search through
+        item (str): String to search for in either the media file or json file name
+        key (bool, optional): If True, search in media file names. If False, search in json file names. Defaults to True.
+
+    Returns:
+        Tuple[str]: The matching (media_file, json_file) tuple if found, False otherwise
+    """
+    for mediaf, jsonf in l:
+        if key:
+            if item in mediaf:
+                return (mediaf, jsonf)
+        else:
+            if item in jsonf:
+                return (mediaf, jsonf)
+    return False
     
-    return matched_files, missing_files, ambiguous_files
+def _list_files(directory:str)->List[str]:
+    if os.path.exists(directory):
+        return os.listdir(directory)
+    logger.warning(f"Directory '{directory}' not found!")
+    return []
+
+## -- from util /\
 
 def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]], List[str], List[Tuple[str, Tuple[str]]]]:
     """
@@ -112,19 +133,19 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
                 potential_jsons.append(f"{basename[:-1]}.json")
 
             # get rid of duplicates
-            potential_jsons = list(set(potential_jsons))
+            potential_jsons = sorted(list(set(potential_jsons)))
             
             # if less than 1 potential matches, there is a problem. move on
             if len(potential_jsons) < 1:
                 missing_files.append(file)
-                logger.warn(f"{msg}no match found.")
+                logger.warning(f"{msg}no match found.")
                 continue
             
             if len(potential_jsons) > 1: # we have too many
                 # get the media extension and match it that way
                 # REMEMBER this could be MP4 too and there may not be a json for it. in that case idk
                 ambiguous_files.append((file, potential_jsons))
-                logger.warn(f"{msg}{len(potential_jsons)} potential matches found.")
+                logger.warning(f"{msg}{len(potential_jsons)} potential matches found.")
                 continue
 
             # if we are this far, then it matched successfully for this instance
@@ -140,7 +161,6 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
             # just try a bunch of things
             potential_jsons = []
             basename = os.path.splitext(file)[0]
-            ext = os.path.splitext(file)[-1]
 
             # i don't know why this cutoff is at 46
             if len(basename) >= 47: 
@@ -220,10 +240,25 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
         #logger.warning(f"Missing:\n{_format_list(missing_files)}")
         logger.warning(f"Ambiguous {num_ambiguous_files}/{total_media_files} files")
 
-
     # conservation of mass
     accounted_for_media_files = num_matched_files + num_missing_files + num_ambiguous_files
     assert accounted_for_media_files == total_media_files, f"accounted_for_media_files != total_media_files ({accounted_for_media_files} != {total_media_files})"
+    return matched_files, missing_files, ambiguous_files
+
+def find_sidecar_files(directory:str):
+    files_in_directory = _list_files(directory)
+    
+    #pickle.dump(files_in_directory, open("tests/cases/case1_i.pkl", "ab"))
+    matched_files, missing_files, ambiguous_files = match_files_from_file_list(files_in_directory)
+    with logging_redirect_tqdm():
+        for media_file, json_file in tqdm(matched_files, desc="validating", leave=False, dynamic_ncols=True):
+            full_media_file = os.path.join(directory, media_file)
+            assert os.path.isfile(full_media_file), f"{full_media_file} doesn't exist!"
+            full_json_file = os.path.join(directory, json_file)
+            assert os.path.isfile(full_json_file), f"{full_json_file} doesn't exist!"
+
+    #pickle.dump(matched_files, open("tests/cases/case1_o.pkl","ab"))
+
     return matched_files, missing_files, ambiguous_files
 
 if __name__ == "__main__":

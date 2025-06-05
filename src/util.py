@@ -1,5 +1,5 @@
 from typing import Union, List, Tuple
-import logging, os
+import logging, os, json, pickle
 logger = logging.getLogger(__name__)
 
 def _format_list(li) -> str:
@@ -46,3 +46,13 @@ def _list_files(directory:str)->List[str]:
         return os.listdir(directory)
     logger.warning(f"Directory '{directory}' not found!")
     return []
+
+def _save_list(l:list, fpath:str):
+    with open(fpath, 'w+') as file:
+        data_to_write = json.dumps(l)
+        file.write(data_to_write)
+
+def _load_list(fpath:str):
+    with open(fpath, 'r') as file:
+        return json.load(file)
+    
