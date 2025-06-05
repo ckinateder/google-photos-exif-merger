@@ -69,7 +69,7 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
             name = basename
             counter = None
             if match:
-                name = match.group("name")
+                name = match.group("name") # get the counter out of the name
                 counter = match.group("counter")
             
             # start off by searching w/ counters
@@ -80,9 +80,9 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
                     if pattern.match(f):
                         potential_jsons.append(f)
             else: # if no counters
-                # now go through and see if anything basic matches with the media extension
-                # if nothing found move forward...
-                pattern = re.compile(rf"^{basename}{media_extension}(?P<suffix>.*){JSON_EXTENSION}$")
+                # reject any JSONS with counters
+                pattern = re.compile(rf"^{basename}{media_extension}(?P<suffix>\.[^()]+){JSON_EXTENSION}$")
+
                 for f in all_json_files:
                     match = pattern.match(f)
                     if match:
@@ -103,10 +103,6 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
 
             # get rid of duplicates
             potential_jsons = list(set(potential_jsons))
-
-            #if basename=="IMG_0356":
-            #    pdb.set_trace()
-
             
             # if less than 1 potential matches, there is a problem. move on
             if len(potential_jsons) < 1:
