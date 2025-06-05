@@ -78,13 +78,23 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
                     if pattern.match(f):
                         potential_jsons.append(f)
             else: # if no counters
-                # only if there's no counter add it
-                pattern = re.compile(rf'^{re.escape(basename)}.*?(?P<counter>\(\d+\))?{re.escape(JSON_EXTENSION)}$')
+                # now go through and see if anything basic matches with the media extension
+                # if nothing found move forward...
+                pattern = re.compile(rf"^{basename}{media_extension}(?P<suffix>.*){JSON_EXTENSION}$")
                 for f in all_json_files:
                     match = pattern.match(f)
-                    if match and not match.group("counter"):
+                    if match:
                         potential_jsons.append(f)
+
+                if len(potential_jsons) == 0:
+                    pattern = re.compile(rf'^{re.escape(basename)}.*?(?P<counter>\(\d+\))?{re.escape(JSON_EXTENSION)}$')
+                    for f in all_json_files:
+                        match = pattern.match(f)
+                        # only if there's no counter add it
+                        if match and not match.group("counter"):
+                            potential_jsons.append(f)
             
+        
             # Handle trailing characters: _, _n, _n-
             if basename.endswith(('_n-', '_n', '_')):
                 potential_jsons.append(f"{basename[:-1]}.json")
@@ -92,6 +102,10 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
             # get rid of duplicates
             potential_jsons = list(set(potential_jsons))
 
+            if basename=="IMG_0356":
+                pdb.set_trace()
+
+            
             # if less than 1 potential matches, there is a problem. move on
             if len(potential_jsons) < 1:
                 missing_files.append(file)
@@ -148,13 +162,8 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
                 if existing_match != False:
                     logger.debug(f"Found {basename} in matched, falling back.")
                     recovered.append((file, existing_match[1]))
-                    #pdb.set_trace()
                     continue
 
-
-            #else:
-            #    pdb.set_trace()
-            
     # move found files into matched_files
     logger.info(f"Recovered {len(recovered)} missing metadata files.")
     matched_files += recovered
