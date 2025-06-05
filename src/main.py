@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif", ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".f4v", ".f4p", ".f4a", ".f4b"]
 JSON_EXTENSION = ".json"
-JSON_SUFFIX = ["supple", "supplemen", "supplemental-metadata", "s"]
 
 
 def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str, Tuple[str]]]]:
@@ -51,31 +50,39 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
 
     with logging_redirect_tqdm():
         for file in tqdm(all_media_files, desc="media files", leave=False, dynamic_ncols=True):
+            # initialize variables
             fullpath = os.path.join(directory, file)
             basename = os.path.splitext(file)[0]
             media_extension = os.path.splitext(file)[1] #.lower()
             msg = f"Checking '{file}'... "
+            potential_jsons = []
 
             # get basename
             # remove -edited suffix if there
             basename = re.sub(r'-edited$', '', basename, flags=re.IGNORECASE)
-
-            # BASIC: use regex to check if there exists a file with the same base name, anything, then .json
-            pattern = re.compile(rf'^{re.escape(basename)}.*\{JSON_EXTENSION}$')
-            potential_jsons = [f for f in all_json_files if pattern.match(f)]
-
-            # Handle edge case like 'foo(1).jpg' => 'foo.jpg(1).json'
+            
+            # get counter if there is one
             pattern = re.compile(r"(?P<name>.*)(?P<counter>\(\d+\))$")
             match = pattern.match(basename)
+            name = basename
+            counter = None
             if match:
                 name = match.group("name")
                 counter = match.group("counter")
-                # search in all_json_files for f"{name}{media_extension}*{counter}.json"
+            
+            # start off by searching w/ counters
+            if counter: # if it takes the form foo(n).jpg
+                # search in all_json_files
                 pattern = re.compile(rf"^{name}{media_extension}(?P<suffix>.*){re.escape(counter)}{JSON_EXTENSION}$")
-                #if basename=="IMG_0368(1)":
-                #    pdb.set_trace()
                 for f in all_json_files:
                     if pattern.match(f):
+                        potential_jsons.append(f)
+            else: # if no counters
+                # only if there's no counter add it
+                pattern = re.compile(rf'^{re.escape(basename)}.*?(?P<counter>\(\d+\))?{re.escape(JSON_EXTENSION)}$')
+                for f in all_json_files:
+                    match = pattern.match(f)
+                    if match and not match.group("counter"):
                         potential_jsons.append(f)
             
             # Handle trailing characters: _, _n, _n-
@@ -103,7 +110,6 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
             assert os.path.isfile(os.path.join(directory, json_file))
             matched_files.append((file, json_file))
             logger.info(f"{msg}match found at '{json_file}'!")
-
 
     # stage 2: search deeeper for missing files
     logger.info(f"Attempting to fix {len(missing_files)} missing metadata files...")
@@ -142,7 +148,7 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
                 if existing_match != False:
                     logger.debug(f"Found {basename} in matched, falling back.")
                     recovered.append((file, existing_match[1]))
-                    pdb.set_trace()
+                    #pdb.set_trace()
                     continue
 
 
@@ -161,9 +167,17 @@ def match_files(directory) -> Union[List[Tuple[str]], List[str], List[Tuple[str,
             # check if one of the ambiguous ones has already been matched? and then pick the other one
             potential_jsons = []
             basename = os.path.splitext(file)[0]
-            #if basename == "IMG_0340":
-            #    pdb.set_trace()
+            
+            if basename=="IMG_0356":
+                pdb.set_trace()
+
+            # first easy case
+
     
+    # sort by name
+    matched_files.sort(key=lambda x: x[0])
+    ambiguous_files.sort(key=lambda x: x[0])
+
     # print
     logger.info(f"Matched:\n{_format_list(matched_files)}")
     logger.info(f"Missing:\n{_format_list(missing_files)}")
