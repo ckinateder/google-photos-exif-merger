@@ -116,9 +116,9 @@ Make sure you have Python 3.12 or later installed.
 
 Install [ExifTool](https://exiftool.org/). Instructions can be found [here](https://exiftool.org/install.html).
 
-### Installation
+(Optional): Docker.
 
-_Below is an example of how you can instruct your audience on installing and setting up your app. This template doesn't rely on any external dependencies or services._
+### Installation
 
 1. Clone the repo
    ```sh
@@ -138,9 +138,7 @@ _Below is an example of how you can instruct your audience on installing and set
 
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
 
-_For more examples, please refer to the [Documentation](https://example.com)_
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+<!-- _For more examples, please refer to the [Documentation](https://example.com)_-->
 
 Follow the command line argument structure:
 
@@ -205,6 +203,7 @@ $ docker run --rm -it --entrypoint bash google-photos-exif-merger
 root@0d7f1829c10a:/app# python3 -m unittest -v test.test_main
 ```
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 <!-- ROADMAP -->
 ## Roadmap
 
