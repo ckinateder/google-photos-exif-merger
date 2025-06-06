@@ -49,109 +49,82 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
 
     with logging_redirect_tqdm():
         for file in tqdm(all_media_files, desc="media files", leave=False, dynamic_ncols=True):
-            # initialize variables
             basename = os.path.splitext(file)[0]
-            media_extension = os.path.splitext(file)[1] #.lower()
+            media_extension = os.path.splitext(file)[1]
             msg = f"Checking '{file}'... "
-            potential_jsons = []
-
-            # get basename
-            # remove -edited suffix if there
+            
+            # Remove -edited suffix
             basename = re.sub(r'-edited$', '', basename, flags=re.IGNORECASE)
             
-            # get counter if there is one
-            pattern = re.compile(r"(?P<name>.*)(?P<counter>\(\d+\))$")
-            match = pattern.match(basename)
-            name = basename
-            counter = None
-            if match:
-                name = match.group("name") # get the counter out of the name
-                counter = match.group("counter")
+            # Check for counter pattern like (1), (2) at the end
+            counter_match = re.search(r'(.+)(\(\d+\))$', basename)
+            potential_jsons = []
             
-            # start off by searching w/ counters
-            if counter: # if it takes the form foo(n).jpg
-                # search in all_json_files
-                pattern = re.compile(rf"^{name}{media_extension}(?P<suffix>.*){re.escape(counter)}{JSON_EXTENSION}$")
-                for f in all_json_files:
-                    if pattern.match(f):
-                        potential_jsons.append(f)
-            else: # if no counters
-                # reject any JSONS with counters
-                pattern = re.compile(rf"^{basename}{media_extension}(?P<suffix>\.[^()]+){JSON_EXTENSION}$")
-
-                for f in all_json_files:
-                    match = pattern.match(f)
-                    if match:
-                        potential_jsons.append(f)
-
-                if len(potential_jsons) == 0:
-                    pattern = re.compile(rf'^{re.escape(basename)}.*?(?P<counter>\(\d+\))?{re.escape(JSON_EXTENSION)}$')
-                    for f in all_json_files:
-                        match = pattern.match(f)
-                        # only if there's no counter add it
-                        if match and not match.group("counter"):
-                            potential_jsons.append(f)
+            if counter_match:
+                # Has counter: look for name.ext.*counter.json
+                name = counter_match.group(1)
+                counter = counter_match.group(2)
+                pattern = f"{re.escape(name)}{re.escape(media_extension)}.*{re.escape(counter)}{re.escape(JSON_EXTENSION)}"
+            else:
+                # No counter: look for basename.ext.*.json (but exclude files with counters)
+                pattern = f"{re.escape(basename)}{re.escape(media_extension)}\\.[^()]+{re.escape(JSON_EXTENSION)}"
             
-        
-            # Handle trailing characters: _, _n, _n-
+            # Find matches
+            for json_file in all_json_files:
+                if re.match(pattern, json_file):
+                    potential_jsons.append(json_file)
+            
+            # Fallback: if no counter and no matches, try loose matching
+            if not counter_match and not potential_jsons:
+                fallback_pattern = f"^{re.escape(basename)}.*{re.escape(JSON_EXTENSION)}$"
+                for json_file in all_json_files:
+                    if re.match(fallback_pattern, json_file) and '(' not in json_file:
+                        potential_jsons.append(json_file)
+            
+            # Handle special trailing characters
             if basename.endswith(('_n-', '_n', '_')):
-                potential_jsons.append(f"{basename[:-1]}.json")
-
-            # get rid of duplicates
-            potential_jsons = sorted(list(set(potential_jsons)))
+                potential_jsons.append(f"{basename.rstrip('_n-')}.json")
             
-            # if less than 1 potential matches, there is a problem. move on
-            if len(potential_jsons) < 1:
+            # Remove duplicates
+            potential_jsons = sorted(set(potential_jsons))
+            
+            # Categorize results
+            if len(potential_jsons) == 0:
                 missing_files.append(file)
                 logger.debug(f"{msg}no match found.")
-                continue
-            
-            if len(potential_jsons) > 1: # we have too many
-                # get the media extension and match it that way
-                # REMEMBER this could be MP4 too and there may not be a json for it. in that case idk
+            elif len(potential_jsons) > 1:
                 ambiguous_files.append((file, potential_jsons))
                 logger.debug(f"{msg}{len(potential_jsons)} potential matches found.")
-                continue
-
-            # if we are this far, then it matched successfully for this instance
-            json_file = potential_jsons[0]
-            matched_files.append((file, json_file))
-            logger.debug(f"{msg}match found at '{json_file}'!")
+            else:
+                matched_files.append((file, potential_jsons[0]))
+                logger.debug(f"{msg}match found at '{potential_jsons[0]}'!")
 
     # stage 2: search deeeper for missing files
     logger.info(f"Attempting to fix {len(missing_files)} missing metadata files...")
     recovered = []
     with logging_redirect_tqdm():
         for file in tqdm(missing_files, desc="missing files", leave=False, dynamic_ncols=True):
-            # just try a bunch of things
-            potential_jsons = []
             basename = os.path.splitext(file)[0]
-
-            # i don't know why this cutoff is at 46
-            if len(basename) >= 47: 
-                # just check to see if the cutoff exists.
-                cutoff_file = basename[:46] + JSON_EXTENSION 
+    
+            # Check for filename cutoff at 46 characters
+            if len(basename) >= 47:
+                cutoff_file = basename[:46] + JSON_EXTENSION
                 if cutoff_file in all_json_files:
                     recovered.append((file, cutoff_file))
                     continue
-
-            # search for anything with the same basename in matched
+            
+            # Look for exact basename match in already matched files
             existing_match = _find_in_matched(matched_files, basename)
-            if existing_match != False:
+            if existing_match:
                 logger.debug(f"Found {basename} in matched, falling back.")
                 recovered.append((file, existing_match[1]))
                 continue
             
-            # ------- THE FOLLOWING DOES NOTHING BUT MAY BE USEFUL FOR AMBIGUOUS FILES ------
-            # search for anything with same basename minus counter in matched
-            pattern = re.compile(r"(?P<name>.*)(?P<counter>\(\d+\))$")
-            match = pattern.match(basename)
-            if match:
-                name = match.group("name")
-                counter = match.group("counter")
-                basename_no_counter = name
+            # Try removing counter like (1), (2) and search again
+            if basename.endswith(')') and '(' in basename:
+                basename_no_counter = re.sub(r'\(\d+\)$', '', basename)
                 existing_match = _find_in_matched(matched_files, basename_no_counter)
-                if existing_match != False:
+                if existing_match:
                     logger.debug(f"Found {basename} in matched, falling back.")
                     recovered.append((file, existing_match[1]))
                     continue
@@ -164,18 +137,17 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
     
     recovered = []
 
-    # stage 3: examine all the ambiguous files
+    # stage 3: examine all the ambiguous files. this happens a lot with live photos
     logger.info(f"Attempting to fix {len(ambiguous_files)} ambiguous metadata files...")
     with logging_redirect_tqdm():
         for file, prospects in tqdm(ambiguous_files, desc="ambiguous files", leave=False, dynamic_ncols=True):
-            # check if one of the ambiguous ones has already been matched? and then pick the other one
             basename = os.path.splitext(file)[0]
-            media_extension = os.path.splitext(file)[1] #.lower()
-            # first easy case: LIVE PHOTO
-            if media_extension.lower() == LIVE_PHOTO_EXTENSION:
-                # just pick the first one
+            media_extension = os.path.splitext(file)[1]
+            if media_extension.lower() == LIVE_PHOTO_EXTENSION: # if live photo
+                # just pick the first one because it doesn't matter, they'll be the same...? should verify this claim though
                 recovered.append((file, prospects[0]))
 
+    # print
     logger.info(f"Recovered {len(recovered)} ambiguous metadata files.")
     matched_files += recovered
 
