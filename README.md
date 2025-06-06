@@ -86,7 +86,7 @@
 
 I have wasted so much time trying to merge 400 gigabytes of my exported photos from Google Takeout that I decided to make a tool so that nobody else has to go through this. I tried a bunch of publicly available options, but none worked for me, so I made my own. Hopefully this works for you too.
 
-**THIS DOES NOT YET WORK!!!**
+**THIS DOES NOT YET FULLY WORK!!!**
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -165,7 +165,7 @@ For example, to process files in `/media/vault/Pictures/Google\ Photos/Photos\ f
 python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020 --outputDir /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed
 ```
 
-### Tests
+### Testing
 
 An important aspect of developing this project is to verify that the output stays the same for a specific directory. One way to do this is in the `test` directory. I have created 5 test cases already. To run them:
 ```bash
@@ -179,13 +179,38 @@ python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Photos\ 
 ```
 It is not necessary to make your own test cases.
 
+### Docker
+
+This can also be run in the docker container.
+To build with the Dockerfile, run
+```bash
+docker build -t google-photos-exif-merger .
+```
+To run it, run
+```bash
+docker run -v /path/to/input:/app/input -v /path/to/output:/app/output google-photos-exif-merger
+```
+
+Example:
+```bash
+docker run -v /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020:/app/input -v /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed:/app/output google-photos-exif-merger
+```
+
+#### Testing With Docker
+
+It's possible to run tests from Docker too. You'll have to directly enter the container and run it inside:
+
+```bash
+$ docker run --rm -it --entrypoint bash google-photos-exif-merger
+root@0d7f1829c10a:/app# python3 -m unittest -v test.test_main
+```
+
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Add Changelog
-- [x] Add back to top links
-- [ ] Finish file mapping
-- [ ] Add support for manual file matching
+- [x] Finish file mapping
+- [x] Add test cases
+- [ ] Simplify JSON
 - [ ] Add support for metadata with exiftool
 - [ ] Add final passthrough for JSON validation
 
