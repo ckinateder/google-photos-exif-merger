@@ -4,11 +4,13 @@ import os
 import re
 import pdb
 from typing import Union, List, Tuple
-#from src.util import _format_list, _find_in_matched, _remove_from_list, _list_files, _save_list
+from util import _format_list, _find_in_matched, _list_files
 from tqdm import trange, tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+from __init__ import *
 import logging
-
+import json
+import pickle
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -20,43 +22,6 @@ logger = logging.getLogger(__name__)
 MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif", ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".f4v", ".f4p", ".f4a", ".f4b"]
 LIVE_PHOTO_EXTENSION = ".mp4"
 JSON_EXTENSION = ".json"
-
-## -- from util \/
-def _format_list(li) -> str:
-    out = ""
-    max_digits = len(str(len(li) - 1))
-    for i, l in enumerate(li):
-        out += f"{i:0{max_digits}d}: {l}\n"
-    return out[:-2]
-
-def _find_in_matched(l: List[Tuple[str]], item:str, key=True) -> Tuple[str]:
-    """
-    Search through a list of (media_file, json_file) tuples to find a match containing the given item.
-
-    Args:
-        l (List[Tuple[str]]): List of (media_file, json_file) tuples to search through
-        item (str): String to search for in either the media file or json file name
-        key (bool, optional): If True, search in media file names. If False, search in json file names. Defaults to True.
-
-    Returns:
-        Tuple[str]: The matching (media_file, json_file) tuple if found, False otherwise
-    """
-    for mediaf, jsonf in l:
-        if key:
-            if item in mediaf:
-                return (mediaf, jsonf)
-        else:
-            if item in jsonf:
-                return (mediaf, jsonf)
-    return False
-    
-def _list_files(directory:str)->List[str]:
-    if os.path.exists(directory):
-        return os.listdir(directory)
-    logger.warning(f"Directory '{directory}' not found!")
-    return []
-
-## -- from util /\
 
 def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]], List[str], List[Tuple[str, Tuple[str]]]]:
     """
@@ -138,14 +103,14 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
             # if less than 1 potential matches, there is a problem. move on
             if len(potential_jsons) < 1:
                 missing_files.append(file)
-                logger.warning(f"{msg}no match found.")
+                logger.debug(f"{msg}no match found.")
                 continue
             
             if len(potential_jsons) > 1: # we have too many
                 # get the media extension and match it that way
                 # REMEMBER this could be MP4 too and there may not be a json for it. in that case idk
                 ambiguous_files.append((file, potential_jsons))
-                logger.warning(f"{msg}{len(potential_jsons)} potential matches found.")
+                logger.debug(f"{msg}{len(potential_jsons)} potential matches found.")
                 continue
 
             # if we are this far, then it matched successfully for this instance
@@ -245,10 +210,9 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
     assert accounted_for_media_files == total_media_files, f"accounted_for_media_files != total_media_files ({accounted_for_media_files} != {total_media_files})"
     return matched_files, missing_files, ambiguous_files
 
-def find_sidecar_files(directory:str):
+def find_sidecar_files(directory:str, test_case_dir:str = None):
     files_in_directory = _list_files(directory)
     
-    #pickle.dump(files_in_directory, open("tests/cases/case1_i.pkl", "ab"))
     matched_files, missing_files, ambiguous_files = match_files_from_file_list(files_in_directory)
     with logging_redirect_tqdm():
         for media_file, json_file in tqdm(matched_files, desc="validating", leave=False, dynamic_ncols=True):
@@ -257,7 +221,23 @@ def find_sidecar_files(directory:str):
             full_json_file = os.path.join(directory, json_file)
             assert os.path.isfile(full_json_file), f"{full_json_file} doesn't exist!"
 
-    #pickle.dump(matched_files, open("tests/cases/case1_o.pkl","ab"))
+    if test_case_dir:
+        logger.info(f"Saving test cases to {test_case_dir}...")
+        os.makedirs(test_case_dir, exist_ok=True)
+        in_path = os.path.join(test_case_dir, IN_PKL_NAME)
+        out_path = os.path.join(test_case_dir, OUT_PKL_NAME)
+        props_path = os.path.join(test_case_dir, PROPS_JSON_NAME)
+        props = {
+            "matched_files_length": len(matched_files),
+            "missing_files_length": len(missing_files),
+            "ambiguous_files_length": len(ambiguous_files),
+        }
+        with open(in_path, "ab") as infile, open(out_path, "ab") as outfile, open(props_path, "w") as propsfile:
+            pickle.dump(files_in_directory, infile)
+            pickle.dump(matched_files, outfile)
+            json.dump(props, propsfile, indent=2)
+            
+        logger.info(f"I/O saved to in.pkl, out.pkl, and props.json in {test_case_dir}.")
 
     return matched_files, missing_files, ambiguous_files
 
@@ -268,6 +248,7 @@ if __name__ == "__main__":
     parser.add_argument("--inputDir", type=str, required=True, help="Input directory")
     parser.add_argument("--outputDir", type=str, required=True, help="Output directory")
     parser.add_argument("--logLevel", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level")
+    parser.add_argument("--testCaseDir", type=str, required=False, help="Path to save the input and output as a test case")
     args = parser.parse_args()
 
     # Set log level from command line argument
@@ -276,4 +257,4 @@ if __name__ == "__main__":
     logger.info(f"Input dir:  {args.inputDir}")
     logger.info(f"Output dir: {args.outputDir}")
 
-    matched_files, missing_files, ambiguous_files = find_sidecar_files(args.inputDir)
+    matched_files, missing_files, ambiguous_files = find_sidecar_files(args.inputDir, args.testCaseDir)

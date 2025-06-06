@@ -142,7 +142,42 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+Follow the command line argument structure:
 
+```
+usage: main.py [-h] --inputDir INPUTDIR --outputDir OUTPUTDIR [--logLevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+               [--testCaseDir TESTCASEDIR]
+
+options:
+  -h, --help            show this help message and exit
+  --inputDir INPUTDIR   Input directory
+  --outputDir OUTPUTDIR
+                        Output directory
+  --logLevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Logging level
+  --testCaseDir TESTCASEDIR
+                        Path to save the input and output as a test case
+```
+
+For example, to process files in `/media/vault/Pictures/Google\ Photos/Photos\ from\ 2020` and copy them into `/media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed`, you'd run
+
+```bash
+python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020 --outputDir /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed
+```
+
+### Tests
+
+An important aspect of developing this project is to verify that the output stays the same for a specific directory. One way to do this is in the `test` directory. I have created 5 test cases already. To run them:
+```bash
+python3 -m unittest -v test.test_main
+```
+
+You can also make your own test cases with the `--testCaseDir` flag.
+The following command will save the input directory and ouput matchings to `test/scenarios/case0`.
+```bash
+python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020 --outputDir /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed --testCaseDir test/scenarios/case0
+```
+It is not necessary to make your own test cases.
 
 <!-- ROADMAP -->
 ## Roadmap
