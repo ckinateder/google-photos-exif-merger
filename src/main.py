@@ -29,8 +29,8 @@ def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False) -> bool:
     if not dryRun:
         # delete output dir if it exists
         if os.path.exists(outputDir):
-            logger.info(f"Deleting output directory {outputDir}")
-            run_command(f"rm -rf {outputDir}")
+            logger.warning(f"Output directory {outputDir} already exists! Exiting.")
+            return False
         logger.info(f"Creating output directory {outputDir}")
         os.makedirs(outputDir, exist_ok=True)
 
