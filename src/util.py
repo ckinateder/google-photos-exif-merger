@@ -1,6 +1,6 @@
 from typing import Union, List, Tuple
 import logging, os, json, pickle
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 import subprocess
 logger = logging.getLogger(__name__)
 
@@ -10,6 +10,19 @@ def run_command(command:str, verbose:bool=False):
     result = subprocess.run(command, capture_output=True, text=True, shell=True)
     return result.stdout, result.stderr, result.returncode
 
+# Check if date is in DST range (second Sunday in March to first Sunday in November)
+def is_dst(date) -> bool:
+    # Get the year
+    year = date.year
+    # Second Sunday in March
+    dst_start = datetime(year, 3, 8, 2, 0, 0, tzinfo=timezone.utc)
+    while dst_start.weekday() != 6:  # 6 is Sunday
+        dst_start = dst_start + timedelta(days=1)
+    # First Sunday in November
+    dst_end = datetime(year, 11, 1, 2, 0, 0, tzinfo=timezone.utc)
+    while dst_end.weekday() != 6:  # 6 is Sunday
+        dst_end = dst_end + timedelta(days=1)
+    return dst_start <= date <= dst_end
 def _format_list(li) -> str:
     out = ""
     max_digits = len(str(len(li) - 1))

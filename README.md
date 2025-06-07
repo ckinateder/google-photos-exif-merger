@@ -221,8 +221,10 @@ root@0d7f1829c10a:/app# python3 -m unittest -v test.test_main
 
 - [x] Finish file mapping
 - [x] Add test cases
-- [ ] Make file extensions editable
-- [ ] Add support for metadata with exiftool
+- [x] Make file extensions editable
+- [x] Add support for metadata with exiftool
+- [ ] Add support for timezone offset
+- [ ] Fix file removal
 - [ ] Add final passthrough for JSON validation
 
 See the [open issues](https://github.com/ckinateder/google-photos-exif-merger/issues) for a full list of proposed features (and known issues).
