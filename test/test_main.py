@@ -2,7 +2,7 @@ import pickle
 import unittest
 import json
 import logging
-from src.main import match_files_from_file_list
+from src.match_files import match_files_from_file_list
 from src import IN_PKL_NAME, OUT_PKL_NAME, PROPS_JSON_NAME
 from os.path import join
 from parameterized import parameterized

@@ -163,6 +163,19 @@ For example, to process files in `/media/vault/Pictures/Google\ Photos/Photos\ f
 python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020 --outputDir /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed
 ```
 
+File [`src/__init__.py`](src/__init__.py) contains the list of file extensions that can be processed. By default it is
+
+```python
+MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif", 
+                    ".mp4", ".m4v", ".mov", ".avi", ".mkv", 
+                    ".wmv", ".flv", ".f4v", ".f4p", ".f4a", 
+                    ".f4b", ".webp", ".gif"]
+LIVE_PHOTO_EXTENSION = ".mp4"
+JSON_EXTENSION = ".json"
+```
+but you can change it if you need to process more/less files. This tool will ONLY process media files if they have an extension listed in `MEDIA_EXTENSIONS`.
+
+
 ### Testing
 
 An important aspect of developing this project is to verify that the output stays the same for a specific directory. One way to do this is in the `test` directory. I have created 5 test cases already. To run them:
@@ -209,7 +222,7 @@ root@0d7f1829c10a:/app# python3 -m unittest -v test.test_main
 
 - [x] Finish file mapping
 - [x] Add test cases
-- [ ] Simplify JSON
+- [ ] Make file extensions editable
 - [ ] Add support for metadata with exiftool
 - [ ] Add final passthrough for JSON validation
 
