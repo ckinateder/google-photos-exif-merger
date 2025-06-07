@@ -144,17 +144,18 @@ Follow the command line argument structure:
 
 ```
 usage: main.py [-h] --inputDir INPUTDIR --outputDir OUTPUTDIR [--logLevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
-               [--testCaseDir TESTCASEDIR]
+               [--testCaseDir TESTCASEDIR] [--dryRun]
 
 options:
   -h, --help            show this help message and exit
-  --inputDir INPUTDIR   Input directory
+  --inputDir INPUTDIR   Input directory to read files from
   --outputDir OUTPUTDIR
-                        Output directory
+                        Output directory to COPY files into
   --logLevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Logging level
   --testCaseDir TESTCASEDIR
-                        Path to save the input and output as a test case
+                        Path to save the input and output of the sidecar matching into a test case
+  --dryRun              Prints what it will do but doesn't execute
 ```
 
 For example, to process files in `/media/vault/Pictures/Google\ Photos/Photos\ from\ 2020` and copy them into `/media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed`, you'd run
@@ -170,8 +171,6 @@ MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif",
                     ".mp4", ".m4v", ".mov", ".avi", ".mkv", 
                     ".wmv", ".flv", ".f4v", ".f4p", ".f4a", 
                     ".f4b", ".webp", ".gif"]
-LIVE_PHOTO_EXTENSION = ".mp4"
-JSON_EXTENSION = ".json"
 ```
 but you can change it if you need to process more/less files. This tool will ONLY process media files if they have an extension listed in `MEDIA_EXTENSIONS`.
 

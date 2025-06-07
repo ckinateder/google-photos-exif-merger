@@ -34,13 +34,16 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
     all_json_files = [f for f in filenames if os.path.splitext(f)[1].lower() == JSON_EXTENSION]
     all_media_files = [f for f in filenames if os.path.splitext(f)[1].lower() in MEDIA_EXTENSIONS]
     skipped_files = [f for f in filenames if os.path.splitext(f)[1].lower() not in MEDIA_EXTENSIONS and os.path.splitext(f)[1].lower() != JSON_EXTENSION]
-    logger.info(f"Skipping the following files: {skipped_files}")
+    
+    if len(skipped_files) > 0:
+        logger.info(f"Skipping the following files: {skipped_files}")
+    
     total_media_files = len(all_media_files)
     total_json_files = len(all_json_files)
     logger.info(f"Found {total_media_files} media files and {total_json_files} json files")
 
     with logging_redirect_tqdm():
-        for file in tqdm(all_media_files, desc="media files", leave=False, dynamic_ncols=True):
+        for file in tqdm(all_media_files, desc="finding sidecars", leave=LEAVE_TQDM, dynamic_ncols=True):
             basename = os.path.splitext(file)[0]
             media_extension = os.path.splitext(file)[1]
             msg = f"Checking '{file}'... "
@@ -92,64 +95,67 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
                 logger.debug(f"{msg}match found at '{potential_jsons[0]}'!")
 
     # stage 2: search deeeper for missing files
-    logger.info(f"Attempting to fix {len(missing_files)} missing metadata files...")
-    recovered = []
-    with logging_redirect_tqdm():
-        for file in tqdm(missing_files, desc="missing files", leave=False, dynamic_ncols=True):
-            basename = os.path.splitext(file)[0]
-    
-            # Check for filename cutoff at 46 characters
-            if len(basename) >= 47:
-                cutoff_file = basename[:46] + JSON_EXTENSION
-                if cutoff_file in all_json_files:
-                    recovered.append((file, cutoff_file))
-                    continue
-            
-            # Look for exact basename match in already matched files
-            existing_match = _find_in_matched(matched_files, basename)
-            if existing_match:
-                logger.debug(f"Found {basename} in matched, falling back.")
-                recovered.append((file, existing_match[1]))
-                continue
-            
-            # Try removing counter like (1), (2) and search again
-            if basename.endswith(')') and '(' in basename:
-                basename_no_counter = re.sub(r'\(\d+\)$', '', basename)
-                existing_match = _find_in_matched(matched_files, basename_no_counter)
+    if len(missing_files) > 0:
+        logger.info(f"Attempting to fix {len(missing_files)} missing metadata files...")
+        recovered = []
+        with logging_redirect_tqdm():
+            for file in tqdm(missing_files, desc="fixing missing files", leave=LEAVE_TQDM, dynamic_ncols=True):
+                basename = os.path.splitext(file)[0]
+        
+                # Check for filename cutoff at 46 characters
+                if len(basename) >= 47:
+                    cutoff_file = basename[:46] + JSON_EXTENSION
+                    if cutoff_file in all_json_files:
+                        recovered.append((file, cutoff_file))
+                        continue
+                
+                # Look for exact basename match in already matched files
+                existing_match = _find_in_matched(matched_files, basename)
                 if existing_match:
                     logger.debug(f"Found {basename} in matched, falling back.")
                     recovered.append((file, existing_match[1]))
                     continue
+                
+                # Try removing counter like (1), (2) and search again
+                if basename.endswith(')') and '(' in basename:
+                    basename_no_counter = re.sub(r'\(\d+\)$', '', basename)
+                    existing_match = _find_in_matched(matched_files, basename_no_counter)
+                    if existing_match:
+                        logger.debug(f"Found {basename} in matched, falling back.")
+                        recovered.append((file, existing_match[1]))
+                        continue
 
-    # move found files into matched_files
-    logger.info(f"Recovered {len(recovered)} missing metadata files.")
-    matched_files += recovered
-    for f, _ in recovered:
-        missing_files.remove(f)
-    
-    recovered = []
+        # move found files into matched_files
+        logger.info(f"Recovered {len(recovered)} missing metadata files.")
+        matched_files += recovered
+        for f, _ in recovered:
+            missing_files.remove(f)
+        
+        recovered = []
 
     # stage 3: examine all the ambiguous files. this happens a lot with live photos
-    logger.info(f"Attempting to fix {len(ambiguous_files)} ambiguous metadata files...")
-    with logging_redirect_tqdm():
-        for file, prospects in tqdm(ambiguous_files, desc="ambiguous files", leave=False, dynamic_ncols=True):
-            basename = os.path.splitext(file)[0]
-            media_extension = os.path.splitext(file)[1]
-            if media_extension.lower() == LIVE_PHOTO_EXTENSION: # if live photo
-                # just pick the first one because it doesn't matter, they'll be the same...? should verify this claim though
-                recovered.append((file, prospects[0]))
+    if len(ambiguous_files) > 0:
+        logger.info(f"Attempting to fix {len(ambiguous_files)} ambiguous metadata files...")
+        with logging_redirect_tqdm():
+            for file, prospects in tqdm(ambiguous_files, desc="fixing ambiguous files", leave=LEAVE_TQDM, dynamic_ncols=True):
+                basename = os.path.splitext(file)[0]
+                media_extension = os.path.splitext(file)[1]
+                if media_extension.lower() == LIVE_PHOTO_EXTENSION: # if live photo
+                    # just pick the first one because it doesn't matter, they'll be the same...? should verify this claim though
+                    recovered.append((file, prospects[0]))
 
-    # print
-    logger.info(f"Recovered {len(recovered)} ambiguous metadata files.")
-    matched_files += recovered
+        # print
+        logger.info(f"Recovered {len(recovered)} ambiguous metadata files.")
+        matched_files += recovered
 
-    # remove from list
-    recovered_fs, _ = zip(*recovered)
-    for i, (f, _) in enumerate(ambiguous_files):
-        if f in recovered_fs:
-            ambiguous_files[i] = None
-    
-    ambiguous_files = [x for x in ambiguous_files if x is not None]
+        # remove from list
+        if len(recovered) > 0:
+            recovered_fs, _ = zip(*recovered)
+            for i, (f, _) in enumerate(ambiguous_files):
+                if f in recovered_fs:
+                    ambiguous_files[i] = None
+            
+            ambiguous_files = [x for x in ambiguous_files if x is not None]
     
     # sort by name
     matched_files.sort(key=lambda x: x[0])
@@ -185,7 +191,7 @@ def find_sidecar_files(directory:str, test_case_dir:str = None):
     
     matched_files, missing_files, ambiguous_files = match_files_from_file_list(files_in_directory)
     with logging_redirect_tqdm():
-        for media_file, json_file in tqdm(matched_files, desc="validating", leave=False, dynamic_ncols=True):
+        for media_file, json_file in tqdm(matched_files, desc="validating", leave=LEAVE_TQDM, dynamic_ncols=True):
             full_media_file = os.path.join(directory, media_file)
             assert os.path.isfile(full_media_file), f"{full_media_file} doesn't exist!"
             full_json_file = os.path.join(directory, json_file)

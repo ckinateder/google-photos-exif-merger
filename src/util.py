@@ -1,6 +1,14 @@
 from typing import Union, List, Tuple
 import logging, os, json, pickle
+from datetime import timedelta
+import subprocess
 logger = logging.getLogger(__name__)
+
+def run_command(command:str, verbose:bool=False):
+    if verbose:
+        logger.info(f"Running command: {command}")
+    result = subprocess.run(command, capture_output=True, text=True, shell=True)
+    return result.stdout, result.stderr, result.returncode
 
 def _format_list(li) -> str:
     out = ""
