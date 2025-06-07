@@ -1,7 +1,7 @@
 import os
 import re
 import pdb
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Dict
 from util import _format_list, _find_in_matched, _list_files
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -174,6 +174,11 @@ def match_files_from_file_list(filenames: List[str]=0) -> Union[List[Tuple[str]]
     accounted_for_media_files = num_matched_files + num_missing_files + num_ambiguous_files
     assert accounted_for_media_files == total_media_files, f"accounted_for_media_files != total_media_files ({accounted_for_media_files} != {total_media_files})"
     return matched_files, missing_files, ambiguous_files
+
+def turn_tuple_list_into_dict(tuple_list:List[Tuple[str, str]]) -> Dict[str, str]:
+    # assert no duplicates
+    assert len(tuple_list) == len(set(tuple_list)), "Duplicate files in tuple list"
+    return {file: json_file for file, json_file in tuple_list}
 
 def find_sidecar_files(directory:str, test_case_dir:str = None):
     files_in_directory = _list_files(directory)

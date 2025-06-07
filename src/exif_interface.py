@@ -20,17 +20,27 @@ def read_exif_data_on_files(file_or_directory:str) -> dict:
         file_or_directory (str): _description_
 
     Returns:
-        dict: _description_
+        dict: {
+            "file_path>": {
+                "ExifIFD": {
+                    "DateTimeOriginal": "2022:05:13 11:24:07",
+                    "CreateDate": "2022:05:13 11:24:07",
+                }
+                ...
+            }
+            ...
+        }
     """
-    command = f"exiftool -a -u -g1 -j {file_or_directory}"
+    command = f"exiftool -a -u -g1 -j {repr(file_or_directory)}"
     out, err, rc = run_command(command)
     if rc==0:
         parsed = json.loads(out)
         # now remove anything not in media_extensions
-        to_return = []
+        to_return = {}
         for file_data in parsed:
-            if os.path.splitext(file_data['SourceFile'])[-1].lower() in MEDIA_EXTENSIONS:
-                to_return.append(file_data)
+            filename = file_data['System']['FileName']
+            if os.path.splitext(filename)[-1].lower() in MEDIA_EXTENSIONS:
+                to_return[filename] = file_data
         return to_return
     
     logger.error(f"Couldn't read exif data for {file_or_directory}: {err}")
@@ -74,42 +84,12 @@ def merge_exif_data(original_metadata:dict, supplemental:dict) -> dict:
     merged_metadata["ExifIFD"].update(times_to_update)
     return merged_metadata
 
+def write_exif_data_to_file(file_path:str, exif_data:dict):
+    """Write exif data to a file
 
-
-exjson = {
-  "title": "IMG_0169.HEIC",
-  "description": "",
-  "imageViews": "2",
-  "creationTime": {
-    "timestamp": "1677943954",
-    "formatted": "Mar 4, 2023, 3:32:34 PM EST"
-  },
-  "photoTakenTime": {
-    "timestamp": "1649699171",
-    "formatted": "Apr 11, 2022, 5:46:11 PM EST"
-  },
-  "geoData": {
-    "latitude": 39.127155599999995,
-    "longitude": -84.50772219999999,
-    "altitude": 265.4019434628975,
-    "latitudeSpan": 0.0,
-    "longitudeSpan": 0.0
-  },
-  "geoDataExif": {
-    "latitude": 39.127155599999995,
-    "longitude": -84.50772219999999,
-    "altitude": 265.4019434628975,
-    "latitudeSpan": 0.0,
-    "longitudeSpan": 0.0
-  },
-  "url": "https://photos.google.com/photo/AF1QipMaT5bYHddgvXrD-C9JkFwMXswKrznODJz19d7V",
-  "googlePhotosOrigin": {
-    "mobileUpload": {
-      "deviceType": "IOS_PHONE"
-    }
-  }
-}
-if __name__ == "__main__":
-    ex = read_exif_data_on_files(r"/media/vault/Pictures/Google\ Photos/Playground")[0]
-    print(json.dumps(ex, indent=2))
-    print(json.dumps(merge_exif_data(ex, exjson), indent=2))
+    Args:
+        file_path (str): path to the file
+        exif_data (dict): exif data to write
+    """
+    command = f"exiftool -overwrite_original -P -g1 -j {repr(file_path)}"
+    run_command(command)
