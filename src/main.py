@@ -90,7 +90,8 @@ def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrit
                         'current': current_progress,
                         'total': total_files,
                         'percent': percent,
-                        'file': file
+                        'file': file,
+                        'mute_in_log': True
                     })
 
             except Exception as e:

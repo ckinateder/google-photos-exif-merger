@@ -222,9 +222,11 @@
             status.textContent = `Processing ${data.current} of ${data.total} files (${progressPercent}) - Current file: ${data.file}`;
             
             // Add to log container
-            const logContainer = document.getElementById('log-output');
-            logContainer.innerHTML += `Progress: ${data.current}/${data.total} (${progressPercent}) - ${data.file}<br>`;
-            logContainer.scrollTop = logContainer.scrollHeight;
+            if (!data.mute_in_log) {
+                logContainer.innerHTML += `Progress: ${data.current}/${data.total} (${progressPercent}) - ${data.file}<br>`;
+                logContainer.scrollTop = logContainer.scrollHeight;
+                const logContainer = document.getElementById('log-output');
+            }
         });
 
         socket.on('process_complete', function(data) {
