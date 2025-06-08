@@ -3,7 +3,8 @@ import argparse
 import pdb
 from match_files import find_sidecar_files, turn_tuple_list_into_dict
 from exif_interface import parse_exif_data_from_sidecar, write_exif_data_to_file
-from __init__ import JSON_EXTENSION, MEDIA_EXTENSIONS, LEAVE_TQDM
+from util import run_command
+from __init__ import *
 import logging
 import os
 import json
@@ -20,9 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # main function
-
-
-def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrite_if_exists: bool = False) -> bool:
+def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrite_if_exists: bool = False, progress_callback=None) -> bool:
     # make output dir if not exists
     # will need to check if empty later
     if not dryRun:
@@ -54,7 +53,8 @@ def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrit
 
     # merge metadata
     with logging_redirect_tqdm():
-        for file in tqdm(matched_files_dict, desc="copying metadata", leave=LEAVE_TQDM, dynamic_ncols=True, disable=dryRun):
+        total_files = len(matched_files_dict)
+        for idx, file in enumerate(tqdm(matched_files_dict, desc="copying metadata", leave=LEAVE_TQDM, dynamic_ncols=True, disable=dryRun)):
             try:
                 input_file = os.path.join(
                     inputDir, file)  # input file with path
@@ -81,6 +81,18 @@ def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrit
                         output_file, exif_data_from_sidecar)  # update exif data
                 else:
                     logger.info(f"Would have written exif data using {json_file}")
+
+                # Send progress update through callback
+                if progress_callback:
+                    current_progress = idx + 1
+                    percent = int((current_progress / total_files) * 100)
+                    progress_callback({
+                        'current': current_progress,
+                        'total': total_files,
+                        'percent': percent,
+                        'file': file
+                    })
+
             except Exception as e:
                 logger.error(f"Error merging metadata for {file}: {e}")
                 failed_files[file] = e

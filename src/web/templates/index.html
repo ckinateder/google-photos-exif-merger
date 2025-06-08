@@ -155,6 +155,11 @@
             document.getElementById('logContainer').innerHTML += 'Disconnected from server<br>';
         });
 
+        socket.on('connect_error', function(error) {
+            console.error('Connection error:', error);
+            document.getElementById('logContainer').innerHTML += 'Connection error: ' + error + '<br>';
+        });
+
         socket.on('log_update', function(data) {
             console.log('Received log:', data.log);
             const logContainer = document.getElementById('logContainer');
@@ -162,13 +167,43 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         });
 
+        socket.on('progress_update', function(data) {
+            console.log('Progress update:', data);
+            const progressBar = document.getElementById('progressBar');
+            const status = document.getElementById('status');
+            const progressPercent = data.percent + '%';
+            
+            // Update progress bar
+            progressBar.style.width = progressPercent;
+            progressBar.setAttribute('aria-valuenow', data.percent);
+            
+            // Update status text
+            status.textContent = `Processing ${data.current} of ${data.total} files (${progressPercent}) - Current file: ${data.file}`;
+            
+            // Add to log container
+            const logContainer = document.getElementById('logContainer');
+            logContainer.innerHTML += `Progress: ${data.current}/${data.total} (${progressPercent}) - ${data.file}<br>`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        });
+
         socket.on('process_complete', function(data) {
+            console.log('Process complete:', data);
             isProcessing = false;
+            const progressBar = document.getElementById('progressBar');
+            const status = document.getElementById('status');
+            
             if (data.success) {
-                document.getElementById('status').textContent = 'Processing completed successfully';
+                progressBar.style.width = '100%';
+                progressBar.setAttribute('aria-valuenow', 100);
+                status.textContent = 'Processing completed successfully';
             } else {
-                document.getElementById('status').textContent = 'Processing failed: ' + (data.error || 'Unknown error');
+                status.textContent = 'Processing failed: ' + (data.error || 'Unknown error');
             }
+            
+            // Add to log container
+            const logContainer = document.getElementById('logContainer');
+            logContainer.innerHTML += `Process ${data.success ? 'completed successfully' : 'failed'}<br>`;
+            logContainer.scrollTop = logContainer.scrollHeight;
         });
 
         // Directory browser functions
@@ -273,9 +308,18 @@
                 return;
             }
 
+            console.log('Starting processing with:', {
+                inputDir,
+                outputDir,
+                logLevel,
+                dryRun,
+                overwriteIfExists
+            });
+
             isProcessing = true;
             document.getElementById('status').textContent = 'Processing...';
             document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressBar').setAttribute('aria-valuenow', 0);
 
             fetch('/process', {
                 method: 'POST',
@@ -292,6 +336,7 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('Process response:', data);
                 if (data.error) {
                     alert(data.error);
                     isProcessing = false;
@@ -300,6 +345,7 @@
             .catch(error => {
                 console.error('Error:', error);
                 isProcessing = false;
+                alert('Error starting process: ' + error);
             });
         }
 

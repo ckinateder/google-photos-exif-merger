@@ -1,5 +1,8 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, request, jsonify, send_file
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
 import os
 import logging
 from datetime import datetime
@@ -16,7 +19,7 @@ from src.main import merge_metadata
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 # Configure logging
 logging.basicConfig(
@@ -38,11 +41,9 @@ class WebSocketLogHandler(logging.Handler):
             # Format the log message
             log_entry = self.format(record_copy)
             # Send to WebSocket clients
-            socketio.emit('log_update', {'log': log_entry})
-            # Also store in queue for download
-            log_queue.put(log_entry)
+            socketio.emit('log_update', {'log': log_entry}, namespace='/')
         except Exception as e:
-            print(f"Error in WebSocketLogHandler: {str(e)}")
+            logger.error(f"Error in WebSocketLogHandler: {str(e)}")
             self.handleError(record)
 
 # Add WebSocket handler to logger
@@ -62,15 +63,14 @@ class LogDuplicator(logging.Filter):
 # Add the filter to the main logger
 logger.addFilter(LogDuplicator())
 
-# WebSocket connection events
 @socketio.on('connect')
 def handle_connect():
-    print("Client connected")
-    socketio.emit('log_update', {'log': 'Connected to server'})
+    logger.info("Client connected")
+    emit('log_update', {'log': 'Connected to server'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print("Client disconnected")
+    logger.info("Client disconnected")
 
 @app.route('/')
 def index():
@@ -127,6 +127,28 @@ def select_directory():
         return jsonify({'error': 'Directory does not exist'}), 400
     return jsonify({'success': True, 'path': directory})
 
+def background_process(input_dir, output_dir, dry_run, overwrite, log_level):
+    try:
+        def progress_callback(progress_data):
+            try:
+                socketio.emit('progress_update', progress_data, namespace='/')
+                eventlet.sleep(0)  # Give Socket.IO a chance to send the message
+            except Exception as e:
+                logger.error(f"Error emitting progress update: {str(e)}")
+            
+        success = merge_metadata(input_dir, output_dir, dry_run, overwrite, progress_callback)
+        try:
+            socketio.emit('process_complete', {'success': success}, namespace='/')
+        except Exception as e:
+            print(f"Error emitting process complete: {str(e)}")
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Processing error: {error_msg}")
+        try:
+            socketio.emit('process_complete', {'success': False, 'error': error_msg}, namespace='/')
+        except Exception as e:
+            logger.error(f"Error emitting process error: {str(e)}")
+
 @app.route('/process', methods=['POST'])
 def process():
     data = request.json
@@ -146,22 +168,8 @@ def process():
     logger.setLevel(getattr(logging, log_level))
     web_logger.setLevel(getattr(logging, log_level))
 
-    # Log the start of processing
-    logger.info(f"Starting processing with input: {input_dir}, output: {output_dir}")
-
-    # Start processing in a separate thread
-    def process_thread():
-        try:
-            success = merge_metadata(input_dir, output_dir, dry_run, overwrite)
-            logger.info("Processing completed successfully" if success else "Processing failed")
-            socketio.emit('process_complete', {'success': success})
-        except Exception as e:
-            logger.error(f"Processing error: {str(e)}")
-            socketio.emit('process_complete', {'success': False, 'error': str(e)})
-
-    thread = threading.Thread(target=process_thread)
-    thread.start()
-
+    # Start processing in a background task
+    eventlet.spawn(background_process, input_dir, output_dir, dry_run, overwrite, log_level)
     return jsonify({'message': 'Processing started'})
 
 @app.route('/download_logs')
