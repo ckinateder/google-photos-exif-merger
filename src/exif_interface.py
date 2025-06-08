@@ -7,6 +7,7 @@ from util import run_command, is_dst
 import dateutil
 import pdb
 import logging
+import traceback
 logger = logging.getLogger(__name__)
 
 def read_exif_data_on_file(file_path:str) -> dict:
@@ -121,10 +122,10 @@ def _handle_extension_mismatch(file_path: str, exif_data: dict, verbose: bool) -
     if not exif_data_from_file:
         raise RuntimeError(f"Couldn't read EXIF data for {file_path} to change extension")
         
-    extension = os.path.splitext(file_path)[1].lower()
-    should_be_extension = exif_data_from_file["System"]["FileTypeExtension"].lower()
+    extension = os.path.splitext(file_path)[1]
+    should_be_extension = "." + exif_data_from_file["File"]["FileTypeExtension"]
     
-    if extension != should_be_extension:
+    if extension.lower() != should_be_extension.lower():
         new_file_path = file_path.replace(extension, should_be_extension)
         os.rename(file_path, new_file_path)
         return new_file_path
@@ -146,18 +147,17 @@ def write_exif_data_to_file(file_path: str, exif_data: dict, verbose: bool = Fal
     
     command = _build_exiftool_command(exif_data, file_path)
     _, err, rc = run_command(command, verbose=verbose)
-    
     if rc != 0:
         if verbose:
             logger.error(f"Error writing EXIF data to {file_path}: {err.strip()}")
-            
         try:
             new_file_path = _handle_extension_mismatch(file_path, exif_data, verbose)
+            logger.info(f"Automatically changed extension from {file_path} to {new_file_path} due to mismatch")
             if new_file_path != file_path:
                 command = _build_exiftool_command(exif_data, new_file_path)
                 _, err, rc = run_command(command, verbose=verbose)
                 if rc != 0:
                     raise RuntimeError(f"Failed to write EXIF data after extension change: {err.strip()}")
-                logger.info(f"Automatically changed extension from {file_path} to {new_file_path} due to mismatch")
         except Exception as e:
+            traceback.print_exc()
             raise RuntimeError(f"Failed to handle EXIF data writing: {str(e)}")
