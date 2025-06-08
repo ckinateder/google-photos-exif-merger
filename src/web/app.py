@@ -21,47 +21,49 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s:%(levelname)s: %(message)s',
-    datefmt='%Y-%m-%d_%H:%M:%S'
-)
-logger = logging.getLogger(__name__)
-
-# Queue for storing logs
-log_queue = queue.Queue()
-
 class WebSocketLogHandler(logging.Handler):
     """Custom log handler that sends logs to WebSocket clients"""
+    def __init__(self):
+        super().__init__()
+        self.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s: %(message)s', datefmt='%Y-%m-%d_%H:%M:%S'))
+        # Store logs for download
+        self.log_queue = queue.Queue()
+
     def emit(self, record):
         try:
             # Create a copy of the record to avoid modifying the original
             record_copy = copy.copy(record)
             # Format the log message
             log_entry = self.format(record_copy)
-            # Send to WebSocket clients
-            socketio.emit('log_update', {'log': log_entry}, namespace='/')
+            # Store in queue for download
+            self.log_queue.put(log_entry)
+            # Send to WebSocket clients with level information
+            socketio.emit('log_update', {
+                'log': log_entry,
+                'level': record_copy.levelname,
+                'timestamp': datetime.fromtimestamp(record_copy.created).strftime('%Y-%m-%d_%H:%M:%S')
+            }, namespace='/')
         except Exception as e:
             logger.error(f"Error in WebSocketLogHandler: {str(e)}")
             self.handleError(record)
 
-# Add WebSocket handler to logger
-web_logger = logging.getLogger('web_logger')
-web_logger.setLevel(logging.INFO)
-web_handler = WebSocketLogHandler()
-web_handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s: %(message)s', datefmt='%Y-%m-%d_%H:%M:%S'))
-web_logger.addHandler(web_handler)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s:%(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d_%H:%M:%S'
+)
 
-# Create a custom logging filter to duplicate logs
-class LogDuplicator(logging.Filter):
-    def filter(self, record):
-        # Create a copy of the record for the web logger
-        web_logger.handle(record)
-        return True
+# Create and configure the WebSocket handler
+websocket_handler = WebSocketLogHandler()
+websocket_handler.setLevel(logging.DEBUG)  # Capture all levels
 
-# Add the filter to the main logger
-logger.addFilter(LogDuplicator())
+# Get the root logger and add our handler
+root_logger = logging.getLogger()
+root_logger.addHandler(websocket_handler)
+
+# Get the logger for this module
+logger = logging.getLogger(__name__)
 
 @socketio.on('connect')
 def handle_connect():
@@ -74,8 +76,6 @@ def handle_disconnect():
 
 @app.route('/')
 def index():
-    # Test log when page is loaded
-    logger.info("Web interface loaded")
     return render_template('index.html')
 
 @app.route('/browse_directory', methods=['POST'])
@@ -140,7 +140,7 @@ def background_process(input_dir, output_dir, dry_run, overwrite, log_level):
         try:
             socketio.emit('process_complete', {'success': success}, namespace='/')
         except Exception as e:
-            print(f"Error emitting process complete: {str(e)}")
+            logger.error(f"Error emitting process complete: {str(e)}")
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Processing error: {error_msg}")
@@ -165,8 +165,7 @@ def process():
         return jsonify({'error': 'Input and output directories must be different'}), 400
 
     # Set log level for both loggers
-    logger.setLevel(getattr(logging, log_level))
-    web_logger.setLevel(getattr(logging, log_level))
+    root_logger.setLevel(getattr(logging, log_level))
 
     # Start processing in a background task
     eventlet.spawn(background_process, input_dir, output_dir, dry_run, overwrite, log_level)
@@ -175,10 +174,10 @@ def process():
 @app.route('/download_logs')
 def download_logs():
     # Create a temporary file with all logs
-    log_file = f"logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    log_file = f"logs_{datetime.now().strftime('%Y%m%d_%H%M:%S')}.txt"
     with open(log_file, 'w') as f:
-        while not log_queue.empty():
-            f.write(log_queue.get() + '\n')
+        while not websocket_handler.log_queue.empty():
+            f.write(websocket_handler.log_queue.get() + '\n')
     
     return send_file(log_file, as_attachment=True)
 

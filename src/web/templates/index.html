@@ -6,6 +6,34 @@
     <title>Google Photos EXIF Merger</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .log-container {
+            height: 300px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            padding: 10px;
+            font-family: monospace;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-debug { color: #6c757d; }
+        .log-info { color: #17a2b8; }
+        .log-warning { color: #ffc107; }
+        .log-error { color: #dc3545; }
+        
+        .timestamp {
+            color: #6c757d;
+            margin-right: 8px;
+        }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
@@ -90,7 +118,7 @@
                     Download Logs
                 </button>
             </div>
-            <div id="logContainer" class="bg-gray-50 rounded p-4 h-96 overflow-y-auto font-mono text-sm">
+            <div id="log-output" class="log-container">
             </div>
         </div>
     </div>
@@ -147,23 +175,36 @@
         // WebSocket event handlers
         socket.on('connect', function() {
             console.log('Connected to server');
-            document.getElementById('logContainer').innerHTML += 'Connected to server<br>';
+            document.getElementById('log-output').innerHTML += 'Connected to server<br>';
         });
 
         socket.on('disconnect', function() {
             console.log('Disconnected from server');
-            document.getElementById('logContainer').innerHTML += 'Disconnected from server<br>';
+            document.getElementById('log-output').innerHTML += 'Disconnected from server<br>';
         });
 
         socket.on('connect_error', function(error) {
             console.error('Connection error:', error);
-            document.getElementById('logContainer').innerHTML += 'Connection error: ' + error + '<br>';
+            document.getElementById('log-output').innerHTML += 'Connection error: ' + error + '<br>';
         });
 
         socket.on('log_update', function(data) {
-            console.log('Received log:', data.log);
-            const logContainer = document.getElementById('logContainer');
-            logContainer.innerHTML += data.log + '<br>';
+            const logContainer = document.getElementById('log-output');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${data.level ? data.level.toLowerCase() : 'info'}`;
+            
+            if (data.timestamp) {
+                const timestamp = document.createElement('span');
+                timestamp.className = 'timestamp';
+                timestamp.textContent = data.timestamp;
+                logEntry.appendChild(timestamp);
+            }
+            
+            const logText = document.createElement('span');
+            logText.textContent = data.log;
+            logEntry.appendChild(logText);
+            
+            logContainer.appendChild(logEntry);
             logContainer.scrollTop = logContainer.scrollHeight;
         });
 
@@ -181,7 +222,7 @@
             status.textContent = `Processing ${data.current} of ${data.total} files (${progressPercent}) - Current file: ${data.file}`;
             
             // Add to log container
-            const logContainer = document.getElementById('logContainer');
+            const logContainer = document.getElementById('log-output');
             logContainer.innerHTML += `Progress: ${data.current}/${data.total} (${progressPercent}) - ${data.file}<br>`;
             logContainer.scrollTop = logContainer.scrollHeight;
         });
@@ -201,7 +242,7 @@
             }
             
             // Add to log container
-            const logContainer = document.getElementById('logContainer');
+            const logContainer = document.getElementById('log-output');
             logContainer.innerHTML += `Process ${data.success ? 'completed successfully' : 'failed'}<br>`;
             logContainer.scrollTop = logContainer.scrollHeight;
         });
