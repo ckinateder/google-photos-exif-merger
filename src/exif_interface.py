@@ -1,7 +1,6 @@
 import subprocess
 import os
 import json
-from __init__ import MEDIA_EXTENSIONS
 from datetime import datetime, timezone, timedelta
 from util import run_command, is_dst
 import dateutil

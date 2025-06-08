@@ -5,7 +5,7 @@ from typing import Union, List, Tuple, Dict
 from util import _format_list, _find_in_matched, _list_files
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
-from __init__ import *
+from __init__ import JSON_EXTENSION, MEDIA_EXTENSIONS, LEAVE_TQDM, LIVE_PHOTO_EXTENSION
 import logging
 import json
 import pickle
