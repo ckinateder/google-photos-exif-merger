@@ -23,16 +23,19 @@ logger = logging.getLogger(__name__)
 # main function
 
 
-def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False) -> bool:
+def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrite_if_exists: bool = False) -> bool:
     # make output dir if not exists
     # will need to check if empty later
     if not dryRun:
         # delete output dir if it exists
-        if os.path.exists(outputDir):
+        if os.path.exists(outputDir) and not overwrite_if_exists:
             logger.warning(f"Output directory {outputDir} already exists! Exiting.")
             return False
-        logger.info(f"Creating output directory {outputDir}")
-        os.makedirs(outputDir, exist_ok=True)
+        elif os.path.exists(outputDir) and overwrite_if_exists:
+            logger.info(f"Overwriting files in output directory {outputDir}")
+        else:
+            logger.info(f"Creating output directory {outputDir}")
+            os.makedirs(outputDir, exist_ok=True)
 
     # first, get sidecar files
     matched_files, missing_files, ambiguous_files = find_sidecar_files(
@@ -75,11 +78,8 @@ def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False) -> bool:
                 # write to output dir
                 if not dryRun:
                     logger.debug(f"Writing exif data using {json_file}")
-                    result = write_exif_data_to_file(
+                    write_exif_data_to_file(
                         output_file, exif_data_from_sidecar)  # update exif data
-                    if result != True:
-                        logger.error(f"Failed to write exif data to {output_file}: {result}")
-                        failed_files[file] = result
                 else:
                     logger.info(f"Would have written exif data using {json_file}")
             except Exception as e:
@@ -111,6 +111,8 @@ if __name__ == "__main__":
                         help="Path to save the input and output of the sidecar matching into a test case")
     parser.add_argument("--dryRun", action="store_true",
                         help="Prints what it will do but doesn't execute")
+    parser.add_argument("--overwriteIfExists", action="store_true",
+                        help="Overwrite the output directory if it exists")
     args = parser.parse_args()
 
     # argument validation
@@ -128,4 +130,4 @@ if __name__ == "__main__":
             args.inputDir, args.testCaseDir)
         logger.info(f"Exiting")
     else:
-        merge_metadata(args.inputDir, args.outputDir, args.dryRun)
+        merge_metadata(args.inputDir, args.outputDir, args.dryRun, args.overwriteIfExists)

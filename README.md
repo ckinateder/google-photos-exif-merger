@@ -73,7 +73,6 @@
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
 </details>
 
@@ -222,6 +221,7 @@ root@0d7f1829c10a:/app# python3 -m unittest -v test.test_main
 - [x] Add test cases
 - [x] Make file extensions editable
 - [x] Add support for metadata with exiftool
+- [ ] Add auto fix for wrong file extensions
 - [ ] Add support for timezone offset
 - [ ] Fix file removal
 - [ ] Add final passthrough for JSON validation
@@ -269,24 +269,6 @@ Distributed under the Unlicense License. See `LICENSE.txt` for more information.
 ## Contact
 
 [Calvin Kinateder](https://calvinkinateder.com)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-
-Use this space to list resources you find helpful and would like to give credit to. I've included a few of my favorites to kick things off!
-
-* [Choose an Open Source License](https://choosealicense.com)
-* [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
-* [Malven's Flexbox Cheatsheet](https://flexbox.malven.co/)
-* [Malven's Grid Cheatsheet](https://grid.malven.co/)
-* [Img Shields](https://shields.io)
-* [GitHub Pages](https://pages.github.com)
-* [Font Awesome](https://fontawesome.com)
-* [React Icons](https://react-icons.github.io/react-icons/search)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
