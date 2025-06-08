@@ -3,8 +3,7 @@ import argparse
 import pdb
 from match_files import find_sidecar_files, turn_tuple_list_into_dict
 from exif_interface import parse_exif_data_from_sidecar, write_exif_data_to_file
-from util import run_command
-from __init__ import *
+from __init__ import JSON_EXTENSION, MEDIA_EXTENSIONS, LEAVE_TQDM
 import logging
 import os
 import json
