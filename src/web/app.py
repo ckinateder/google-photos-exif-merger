@@ -11,6 +11,7 @@ import sys
 import threading
 import queue
 import copy
+import signal
 
 # Add the project root to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -20,6 +21,9 @@ from src.main import merge_metadata
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
+
+# Global variable to store the current processing task
+current_task = None
 
 class WebSocketLogHandler(logging.Handler):
     """Custom log handler that sends logs to WebSocket clients"""
@@ -128,6 +132,9 @@ def select_directory():
     return jsonify({'success': True, 'path': directory})
 
 def background_process(input_dir, output_dir, dry_run, overwrite, log_level):
+    global current_task
+    current_task = eventlet.getcurrent()
+    
     try:
         def progress_callback(progress_data):
             try:
@@ -141,6 +148,12 @@ def background_process(input_dir, output_dir, dry_run, overwrite, log_level):
             socketio.emit('process_complete', {'success': success}, namespace='/')
         except Exception as e:
             logger.error(f"Error emitting process complete: {str(e)}")
+    except eventlet.greenlet.GreenletExit:
+        logger.info("Processing aborted by user")
+        try:
+            socketio.emit('process_complete', {'success': False, 'error': 'Processing aborted by user'}, namespace='/')
+        except Exception as e:
+            logger.error(f"Error emitting process abort: {str(e)}")
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Processing error: {error_msg}")
@@ -148,6 +161,8 @@ def background_process(input_dir, output_dir, dry_run, overwrite, log_level):
             socketio.emit('process_complete', {'success': False, 'error': error_msg}, namespace='/')
         except Exception as e:
             logger.error(f"Error emitting process error: {str(e)}")
+    finally:
+        current_task = None
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -180,6 +195,20 @@ def download_logs():
             f.write(websocket_handler.log_queue.get() + '\n')
     
     return send_file(log_file, as_attachment=True)
+
+@app.route('/abort', methods=['POST'])
+def abort():
+    global current_task
+    if current_task is not None:
+        try:
+            current_task.kill()
+            logger.info("Processing task aborted")
+            return jsonify({'message': 'Processing aborted'})
+        except Exception as e:
+            logger.error(f"Error aborting task: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+    else:
+        return jsonify({'message': 'No task running'})
 
 if __name__ == '__main__':
     # Test log when server starts

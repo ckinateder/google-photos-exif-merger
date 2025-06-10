@@ -92,9 +92,14 @@
                     </div>
 
                     <!-- Process Button -->
-                    <button onclick="startProcessing()" class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Start Processing
-                    </button>
+                    <div class="flex space-x-2">
+                        <button onclick="startProcessing()" class="flex-1 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Start Processing
+                        </button>
+                        <button onclick="abortProcessing()" id="abortButton" class="hidden inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                            Abort
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -234,6 +239,9 @@
             isProcessing = false;
             const progressBar = document.getElementById('progressBar');
             const status = document.getElementById('status');
+            const abortButton = document.getElementById('abortButton');
+            
+            abortButton.classList.add('hidden');
             
             if (data.success) {
                 progressBar.style.width = '100%';
@@ -363,6 +371,7 @@
             document.getElementById('status').textContent = 'Processing...';
             document.getElementById('progressBar').style.width = '0%';
             document.getElementById('progressBar').setAttribute('aria-valuenow', 0);
+            document.getElementById('abortButton').classList.remove('hidden');
 
             fetch('/process', {
                 method: 'POST',
@@ -383,12 +392,33 @@
                 if (data.error) {
                     alert(data.error);
                     isProcessing = false;
+                    document.getElementById('abortButton').classList.add('hidden');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 isProcessing = false;
+                document.getElementById('abortButton').classList.add('hidden');
                 alert('Error starting process: ' + error);
+            });
+        }
+
+        function abortProcessing() {
+            if (!isProcessing) return;
+            
+            fetch('/abort', {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Abort response:', data);
+                if (data.error) {
+                    alert(data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error aborting process: ' + error);
             });
         }
 

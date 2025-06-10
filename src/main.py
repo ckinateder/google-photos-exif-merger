@@ -11,6 +11,7 @@ import json
 import shutil
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+import eventlet
 
 # Configure logging
 logging.basicConfig(
@@ -22,92 +23,110 @@ logger = logging.getLogger(__name__)
 
 # main function
 def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrite_if_exists: bool = False, progress_callback=None) -> bool:
-    # make output dir if not exists
-    # will need to check if empty later
-    if not dryRun:
-        # delete output dir if it exists
-        if os.path.exists(outputDir) and not overwrite_if_exists:
-            logger.warning(f"Output directory {outputDir} already exists! Exiting.")
+    try:
+        # make output dir if not exists
+        # will need to check if empty later
+        if not dryRun:
+            # delete output dir if it exists
+            if os.path.exists(outputDir) and not overwrite_if_exists:
+                logger.warning(f"Output directory {outputDir} already exists! Exiting.")
+                return False
+            elif os.path.exists(outputDir) and overwrite_if_exists:
+                logger.info(f"Overwriting files in output directory {outputDir}")
+            else:
+                logger.info(f"Creating output directory {outputDir}")
+                os.makedirs(outputDir, exist_ok=True)
+
+        # first, get sidecar files
+        matched_files, missing_files, ambiguous_files = find_sidecar_files(
+            inputDir)
+
+        # confirm that all files have a sidecar file
+        if len(missing_files) > 0:
+            logger.warning(f"Missing sidecar files for {len(missing_files)} files")
+        if len(ambiguous_files) > 0:
+            logger.warning(
+                f"Ambiguous sidecar files for {len(ambiguous_files)} files")
+
+        # turn matched_files into a dict
+        matched_files_dict = turn_tuple_list_into_dict(
+            matched_files)  # {file: json_file}
+        failed_files = {}
+
+        # merge metadata
+        with logging_redirect_tqdm():
+            total_files = len(matched_files_dict)
+            for idx, file in enumerate(tqdm(matched_files_dict, desc="copying metadata", leave=LEAVE_TQDM, dynamic_ncols=True, disable=dryRun)):
+                try:
+                    # Check for interruption
+                    eventlet.sleep(0)
+                    
+                    input_file = os.path.join(
+                        inputDir, file)  # input file with path
+                    json_file = os.path.join(
+                        inputDir, matched_files_dict[file])  # json file with path
+                    with open(json_file, "r") as f:
+                        json_data = json.load(f)
+                    exif_data_from_sidecar = parse_exif_data_from_sidecar(
+                        json_data)
+                    
+                    # copy file to output dir
+                    output_file = os.path.join(
+                        outputDir, file)  # output file with path
+                    if not dryRun:
+                        logger.debug(f"Copying {input_file} -> {output_file}")
+                        shutil.copy(input_file, output_file)  # copy file to output dir
+                    else:
+                        logger.info(f"Would have copied {input_file} -> {output_file}")
+
+                    # write to output dir
+                    if not dryRun:
+                        write_exif_data_to_file(
+                            output_file, exif_data_from_sidecar)  # update exif data
+                        logger.info(f"Wrote exif data to {output_file} using {json_file}")
+                    else:
+                        logger.info(f"Would have written exif data using {json_file}")
+
+                    # Send progress update through callback
+                    if progress_callback:
+                        current_progress = idx + 1
+                        percent = int((current_progress / total_files) * 100)
+                        progress_callback({
+                            'current': current_progress,
+                            'total': total_files,
+                            'percent': percent,
+                            'file': file,
+                            'mute_in_log': True
+                        })
+
+                except eventlet.greenlet.GreenletExit:
+                    logger.warning(f"Processing interrupted at file: {file}")
+                    if not dryRun and os.path.exists(output_file):
+                        try:
+                            os.remove(output_file)
+                            logger.info(f"Cleaned up partial file: {output_file}")
+                        except Exception as e:
+                            logger.error(f"Error cleaning up file {output_file}: {e}")
+                    raise
+                except Exception as e:
+                    logger.error(f"Error merging metadata for {file}: {e}")
+                    failed_files[file] = e
+
+        if len(failed_files) > 0:
+            logger.warning(
+                f"Failed to merge metadata for {len(failed_files)} files")
+            logger.warning(f"Failed files: {failed_files}")
             return False
-        elif os.path.exists(outputDir) and overwrite_if_exists:
-            logger.info(f"Overwriting files in output directory {outputDir}")
-        else:
-            logger.info(f"Creating output directory {outputDir}")
-            os.makedirs(outputDir, exist_ok=True)
-
-    # first, get sidecar files
-    matched_files, missing_files, ambiguous_files = find_sidecar_files(
-        inputDir)
-
-    # confirm that all files have a sidecar file
-    if len(missing_files) > 0:
-        logger.warning(f"Missing sidecar files for {len(missing_files)} files")
-    if len(ambiguous_files) > 0:
-        logger.warning(
-            f"Ambiguous sidecar files for {len(ambiguous_files)} files")
-
-    # turn matched_files into a dict
-    matched_files_dict = turn_tuple_list_into_dict(
-        matched_files)  # {file: json_file}
-    failed_files = {}
-
-    # merge metadata
-    with logging_redirect_tqdm():
-        total_files = len(matched_files_dict)
-        for idx, file in enumerate(tqdm(matched_files_dict, desc="copying metadata", leave=LEAVE_TQDM, dynamic_ncols=True, disable=dryRun)):
-            try:
-                input_file = os.path.join(
-                    inputDir, file)  # input file with path
-                json_file = os.path.join(
-                    inputDir, matched_files_dict[file])  # json file with path
-                with open(json_file, "r") as f:
-                    json_data = json.load(f)
-                exif_data_from_sidecar = parse_exif_data_from_sidecar(
-                    json_data)
-                
-                # copy file to output dir
-                output_file = os.path.join(
-                    outputDir, file)  # output file with path
-                if not dryRun:
-                    logger.debug(f"Copying {input_file} -> {output_file}")
-                    shutil.copy(input_file, output_file)  # copy file to output dir
-                else:
-                    logger.info(f"Would have copied {input_file} -> {output_file}")
-
-                # write to output dir
-                if not dryRun:
-                    logger.debug(f"Writing exif data using {json_file}")
-                    write_exif_data_to_file(
-                        output_file, exif_data_from_sidecar)  # update exif data
-                else:
-                    logger.info(f"Would have written exif data using {json_file}")
-
-                # Send progress update through callback
-                if progress_callback:
-                    current_progress = idx + 1
-                    percent = int((current_progress / total_files) * 100)
-                    progress_callback({
-                        'current': current_progress,
-                        'total': total_files,
-                        'percent': percent,
-                        'file': file,
-                        'mute_in_log': True
-                    })
-
-            except Exception as e:
-                logger.error(f"Error merging metadata for {file}: {e}")
-                failed_files[file] = e
-
-    if len(failed_files) > 0:
-        logger.warning(
-            f"Failed to merge metadata for {len(failed_files)} files")
-        logger.warning(f"Failed files: {failed_files}")
+        
+        logger.info(
+            f"Successfully merged metadata for all {len(matched_files_dict)} files. Copied from {inputDir} to {outputDir}")
+        return True
+    except eventlet.greenlet.GreenletExit:
+        logger.warning("Processing interrupted")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during processing: {e}")
         return False
-    
-    logger.info(
-        f"Successfully merged metadata for all {len(matched_files_dict)} files. Copied from {inputDir} to {outputDir}")
-
-    return True
 
 
 if __name__ == "__main__":
