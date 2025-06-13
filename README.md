@@ -38,7 +38,7 @@
   <p align="center">
     Merge metadata into media files!
     <br />
-    <a href="https://github.com/ckinateder/google-photos-exif-merger"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/ckinateder/google-photos-exif-merger">
     <br />
     <br />
     <a href="https://github.com/ckinateder/google-photos-exif-merger">View Demo</a>
@@ -80,6 +80,12 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
+
+### GUI Version
+
+![Demo](img/gui.png)
+
+### CLI Version
 
 ![Demo](img/app.png)
 
@@ -133,9 +139,7 @@ Install [ExifTool](https://exiftool.org/). Instructions can be found [here](http
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
-<!-- _For more examples, please refer to the [Documentation](https://example.com)_-->
+### CLI Version
 
 Follow the command line argument structure:
 
@@ -155,10 +159,10 @@ options:
   --dryRun              Prints what it will do but doesn't execute
 ```
 
-For example, to process files in `/media/vault/Pictures/Google\ Photos/Photos\ from\ 2020` and copy them into `/media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed`, you'd run
+For example, to process files in `/media/vault/Pictures/Google\ Photos/Playground` and copy them into `/media/vault/Pictures/Google\ Photos/Playground_fixed`, you'd run
 
 ```bash
-python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020 --outputDir /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed
+python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Playground --outputDir /media/vault/Pictures/Google\ Photos/Playground_fixed
 ```
 
 File [`src/__init__.py`](src/__init__.py) contains the list of file extensions that can be processed. By default it is
@@ -171,8 +175,15 @@ MEDIA_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".heif",
 ```
 but you can change it if you need to process more/less files. This tool will ONLY process media files if they have an extension listed in `MEDIA_EXTENSIONS`.
 
+### GUI Version
 
-### Testing
+The GUI version is a simple wrapper around the CLI version that opens in a browser.  To run it, run
+```bash
+python3 src/web/run.py --port 8080
+```
+and then open `http://localhost:8080` in your browser. You can change the port by passing the `--port` flag.
+
+#### Testing
 
 An important aspect of developing this project is to verify that the output stays the same for a specific directory. One way to do this is in the `test` directory. I have created 5 test cases already. To run them:
 ```bash
@@ -182,7 +193,7 @@ python3 -m unittest -v test.test_main
 You can also make your own test cases with the `--testCaseDir` flag.
 The following command will save the input directory and ouput matchings to `test/scenarios/case0`.
 ```bash
-python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020 --outputDir /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed --testCaseDir test/scenarios/case0
+python3 src/main.py -h --inputDir  /media/vault/Pictures/Google\ Photos/Playground --outputDir /media/vault/Pictures/Google\ Photos/Playground_fixed --testCaseDir test/scenarios/case0
 ```
 It is not necessary to make your own test cases.
 
@@ -200,8 +211,10 @@ docker run -v /path/to/input:/app/input -v /path/to/output:/app/output google-ph
 
 Example:
 ```bash
-docker run -v /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020:/app/input -v /media/vault/Pictures/Google\ Photos/Photos\ from\ 2020_fixed:/app/output google-photos-exif-merger
+docker run -v /media/vault/Pictures/Google\ Photos/Playground:/app/input -v /media/vault/Pictures/Google\ Photos/Playground_fixed:/app/output google-photos-exif-merger
 ```
+
+Note that you can run the docker container with the GUI version too. I have not yet tested this, but it should work.
 
 #### Testing With Docker
 
@@ -221,7 +234,7 @@ root@0d7f1829c10a:/app# python3 -m unittest -v test.test_main
 - [x] Add test cases
 - [x] Make file extensions editable
 - [x] Add support for metadata with exiftool
-- [ ] Add auto fix for wrong file extensions
+- [x] Add auto fix for wrong file extensions
 - [ ] Add support for timezone offset
 - [ ] Fix file removal
 - [ ] Add final passthrough for JSON validation
