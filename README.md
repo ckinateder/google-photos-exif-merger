@@ -179,9 +179,9 @@ but you can change it if you need to process more/less files. This tool will ONL
 
 The GUI version is a simple wrapper around the CLI version that opens in a browser.  To run it, run
 ```bash
-python3 src/web/run.py --port 8080
+python3 src/web/run.py --port 5000
 ```
-and then open `http://localhost:8080` in your browser. You can change the port by passing the `--port` flag.
+and then open `http://localhost:5000` in your browser. You can change the port by passing the `--port` flag.
 
 #### Testing
 
