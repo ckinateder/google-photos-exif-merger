@@ -69,11 +69,11 @@ def _list_files(directory:str)->List[str]:
     return []
 
 def _save_list(l:list, fpath:str):
-    with open(fpath, 'w+') as file:
+    with open(fpath, 'w+', encoding='utf-8') as file:
         data_to_write = json.dumps(l)
         file.write(data_to_write)
 
 def _load_list(fpath:str):
-    with open(fpath, 'r') as file:
+    with open(fpath, 'r', encoding='utf-8') as file:
         return json.load(file)
     

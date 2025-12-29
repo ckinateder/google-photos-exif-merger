@@ -208,7 +208,7 @@ def find_sidecar_files(directory:str, test_case_dir:str = None):
             "missing_files_length": len(missing_files),
             "ambiguous_files_length": len(ambiguous_files),
         }
-        with open(in_path, "ab") as infile, open(out_path, "ab") as outfile, open(props_path, "w") as propsfile:
+        with open(in_path, "ab") as infile, open(out_path, "ab") as outfile, open(props_path, "w", encoding="utf-8") as propsfile:
             pickle.dump(files_in_directory, infile)
             pickle.dump(matched_files, outfile)
             json.dump(props, propsfile, indent=2)

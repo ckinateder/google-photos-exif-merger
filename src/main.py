@@ -65,7 +65,7 @@ def merge_metadata(inputDir: str, outputDir: str, dryRun: bool = False, overwrit
                         inputDir, file)  # input file with path
                     json_file = os.path.join(
                         inputDir, matched_files_dict[file])  # json file with path
-                    with open(json_file, "r") as f:
+                    with open(json_file, "r", encoding="utf-8") as f:
                         json_data = json.load(f)
                     exif_data_from_sidecar = parse_exif_data_from_sidecar(
                         json_data)
